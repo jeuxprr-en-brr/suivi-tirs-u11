@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Handball U11 — Suivi des tirs</title><link rel="manifest" href="./manifest.json">
+<style>
+*{box-sizing:border-box} body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#eef2f6;color:#17202a}
+header{background:#123b63;color:white;padding:16px 20px;position:sticky;top:0;z-index:10}
+header h1{margin:0;font-size:24px} header small{opacity:.85}
+main{max-width:1200px;margin:auto;padding:16px}
+.card{background:white;border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 2px 10px #00000012}
+h2,h3{margin-top:0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+label{font-weight:700;font-size:14px;display:block;margin-bottom:5px}
+input,select{width:100%;padding:12px;border:1px solid #cbd5df;border-radius:9px;font-size:16px;background:white}
+.resultSelect{padding:9px;min-width:145px}
+.eng{font-size:16px;padding:12px}
+button{border:0;border-radius:10px;padding:12px 16px;font-size:16px;font-weight:700;cursor:pointer;background:#1769aa;color:white}
+button.secondary{background:#e8eef4;color:#17324d} button.danger{background:#b42318}
+button.success{background:#168447}.big{font-size:20px;padding:16px 22px}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.hidden{display:none!important}
+.badge{display:inline-block;padding:7px 11px;border-radius:999px;background:#e9f2fb;color:#14558b;font-weight:700}
+.playerButtons{display:flex;flex-wrap:wrap;gap:8px}.playerButtons button{background:#e9eef4;color:#18334d}.playerButtons button.active{background:#1769aa;color:white}
+.status{padding:10px 12px;background:#f5f7f9;border-radius:9px;margin-top:10px}
+table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px solid #e5e9ed;text-align:left}th{background:#f5f7f9}
+.scroll{overflow:auto}
+.targetWrap{display:flex;justify-content:center;margin:14px 0}
+.goalOuter{width:min(760px,94vw);aspect-ratio:1.55;border:7px solid #333;border-radius:18px;background:#fdfdfd;position:relative;cursor:crosshair;overflow:hidden}
+#markers{position:absolute;inset:0;z-index:20;pointer-events:none}
+.goalInner{position:absolute;left:12%;top:10%;width:76%;height:80%;border:4px solid #555;background:linear-gradient(#f8fbff,#fff)}
+.zone{position:absolute;width:33.3333%;height:33.3333%;border:1px dashed #b7c0c8}
+.z1{left:0;top:0}.z2{left:33.333%;top:0}.z3{left:66.666%;top:0}.z4{left:0;top:33.333%}.z5{left:33.333%;top:33.333%}.z6{left:66.666%;top:33.333%}.z7{left:0;top:66.666%}.z8{left:33.333%;top:66.666%}.z9{left:66.666%;top:66.666%}
+.zone span{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:12px;color:#7b8791;pointer-events:none}
+.marker{position:absolute;width:34px;height:34px;border-radius:50%;transform:translate(-50%,-50%);border:3px solid white;box-shadow:0 2px 8px #0008;z-index:20;pointer-events:none;color:white;font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;text-shadow:0 1px 2px #000}
+.marker.in{background:#1677ff}.marker.out{background:#d62f2f}
+.marker.in{background:#1677ff}.marker.out{background:#d62f2f}
+.shotInfo{text-align:center;font-size:22px;font-weight:800}
+.resultBtns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.resultBtns button{min-height:54px}.resultBtns button.sel{outline:4px solid #ffd54a}
+.kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.kpi div{background:#f5f7f9;border-radius:10px;padding:12px;text-align:center}.kpi b{display:block;font-size:24px}
+.notice{background:#fff7d6;border:1px solid #f0d36b;padding:11px;border-radius:9px}
+@media(max-width:700px){.resultBtns{grid-template-columns:repeat(2,1fr)}.kpi{grid-template-columns:repeat(2,1fr)}header h1{font-size:20px}}
+</style>
+</head>
+<body>
+<header><h1>🤾 Handball U11 — Suivi des tirs</h1><small>V12 — PC / tablette • données conservées sur cet appareil</small></header>
+<main>
+
+<section class="card" id="setup">
+<h2>🏠 Feuille de base — Préparer la séance</h2>
+<div class="grid">
+<div><label>Exercice (identique pour tous)</label>
+<select id="exercise">
+<option value="5">5 tirs</option><option value="4">4 tirs</option><option value="3">3 tirs</option><option value="2">2 tirs</option>
+<option value="5z">5 tirs – 5 zones d'engagement</option><option value="4z">4 tirs – 4 zones d'engagement</option><option value="3z">3 tirs – 3 zones d'engagement</option><option value="2z">2 tirs – 2 zones d'engagement</option>
+</select></div>
+<div><label>Gardien 1 (par défaut)</label><input id="gk1" placeholder="Nom du gardien 1"></div>
+<div><label>Gardien 2</label><input id="gk2" placeholder="Optionnel"></div>
+<div><label>Gardien 3</label><input id="gk3" placeholder="Optionnel"></div>
+</div>
+<h3 style="margin-top:18px">👥 Liste permanente des joueurs</h3>
+<div class="notice">Renseigne les joueurs une seule fois ici. À chaque séance, tu n'auras ensuite qu'à cocher ceux qui sont présents.</div>
+<div class="grid" id="playersSetup"></div>
+<div class="toolbar" style="margin-top:10px">
+<button class="secondary" id="saveRosterBtn">💾 Enregistrer la liste des joueurs</button>
+<button class="secondary" id="selectAllBtn">☑ Tous</button>
+<button class="secondary" id="clearAllBtn">☐ Aucun</button>
+</div>
+<div id="engagementBox" class="card hidden" style="background:#f8fafc">
+<h3>🎯 Zones d'engagement — définies une seule fois</h3>
+<div class="notice">Choisis ici l'ordre des zones. <b>Le même ordre sera automatiquement appliqué à tous les joueurs.</b></div>
+<div class="grid" id="engagements"></div>
+</div>
+<div class="toolbar" style="margin-top:14px"><button class="big" id="startBtn">▶ Commencer la séance</button><button class="secondary" id="resetDataBtn">Effacer l'historique local</button></div>
+</section>
+
+<section class="card hidden" id="work">
+<div class="toolbar">
+<button class="secondary" id="backSetup">⚙ Retour à la préparation</button>
+<button class="secondary" id="homeBtn">⌂ Feuille de base</button>
+<div style="flex:1"></div><button class="danger big" id="endBtn">⏹ Fin de séance</button>
+</div>
+<hr>
+<div class="playerButtons" id="playerNav"></div>
+<div class="grid" style="margin-top:12px">
+<div><label>Gardien pour ce joueur</label><select id="playerGK"></select></div>
+<div><label>Progression</label><div class="status" id="progress"></div></div>
+</div>
+<div id="engagementCurrent" class="status"></div>
+<div class="shotInfo" id="shotInfo"></div>
+<div class="grid" style="margin:12px 0">
+<div><label>Résultat du tir</label>
+<select id="currentResult">
+<option value="À renseigner">À renseigner</option>
+<option value="But">But</option>
+<option value="Arrêt">Arrêt</option>
+<option value="Poteau">Poteau</option>
+<option value="Barre">Barre</option>
+<option value="À côté">À côté</option>
+</select></div>
+<div class="status"><b>Mode :</b> si tu cliques à l'extérieur, le résultat devient automatiquement <b>À côté</b>. Dans la cage, le résultat proposé est <b>But</b> et tu peux le modifier.</div>
+</div>
+<div class="targetWrap">
+<div class="goalOuter" id="goal">
+<div id="markers"></div>
+<div class="goalInner">
+<div class="zone z1"><span>1</span></div><div class="zone z2"><span>2</span></div><div class="zone z3"><span>3</span></div>
+<div class="zone z4"><span>4</span></div><div class="zone z5"><span>5</span></div><div class="zone z6"><span>6</span></div>
+<div class="zone z7"><span>7</span></div><div class="zone z8"><span>8</span></div><div class="zone z9"><span>9</span></div>
+</div></div></div>
+<div class="notice">Clique sur le point d'impact. <b>Dans la cage = bleu</b> • <b>à l'extérieur = rouge</b>. Un clic enregistre automatiquement le tir.</div>
+<div class="kpi" style="margin-top:12px" id="liveKpi"></div>
+<h3 style="margin-top:18px">🧤 Statistiques des gardiens</h3>
+<div class="scroll"><table><thead><tr><th>Gardien</th><th>Joueurs</th><th>Tirs reçus</th><th>Arrêts</th><th>% arrêts</th></tr></thead><tbody id="gkTable"></tbody></table></div>
+<h3 style="margin-top:18px">Tirs du joueur</h3>
+<div class="scroll"><table><thead><tr><th>#</th><th>Engagement</th><th>Impact</th><th>Résultat</th><th>Action</th></tr></thead><tbody id="shotTable"></tbody></table></div>
+<div class="toolbar" style="margin-top:12px">
+<button class="secondary" id="undoBtn">↩ Annuler le dernier tir</button>
+<button class="secondary" id="analysisBtn">📊 Analyse rapide</button>
+</div>
+<div id="analysis" class="status hidden"></div>
+</section>
+
+<section class="card hidden" id="summary">
+<h2>✅ Bilan de la séance</h2>
+<div id="finalSummary"></div>
+<div class="toolbar" style="margin-top:14px">
+<button class="big" id="historyBtn">📚 Voir l'historique des séances</button>
+<button class="big" id="seasonBtn">📈 Voir le suivi de saison</button>
+<button class="secondary" id="newSessionBtn">➕ Nouvelle séance</button>
+</div>
+</section>
+
+<section class="card" id="history">
+<h2>📚 Historique des séances</h2>
+<div class="notice">Toutes les séances enregistrées sur cet appareil apparaissent ici. Sélectionne une séance pour revoir son bilan.</div>
+<div class="grid" style="margin-top:12px">
+<div><label>Séance</label><select id="historySession"><option value="">Choisir une séance</option></select></div>
+</div>
+<div id="historyDetail" style="margin-top:14px"></div>
+</section>
+
+<section class="card" id="dataTools">
+<h2>💾 Sauvegarde des données</h2>
+<div class="notice">Les séances sont conservées sur cet appareil. Fais régulièrement une sauvegarde pour pouvoir les restaurer sur une autre tablette.</div>
+<div class="toolbar" style="margin-top:12px">
+<button class="big" id="exportBtn">📤 Exporter mes données</button>
+<button class="secondary big" id="importBtn">📥 Importer une sauvegarde</button>
+<input type="file" id="importFile" accept=".json,application/json" class="hidden">
+</div>
+<div class="status" style="margin-top:10px">La sauvegarde contient la liste des joueurs et tout l'historique des séances.</div>
+</section>
+
+<section class="card" id="season">
+<h2>📈 Suivi de saison</h2>
+<div class="grid"><div><label>Joueur</label><select id="seasonPlayer"><option value="">Choisir un joueur</option></select></div></div>
+<div id="seasonView" style="margin-top:12px"></div>
+</section>
+</main>
+
+<script>
+const POS=["Aile gauche","Arrière gauche","Centre","Arrière droit","Aile droite","6 m gauche","6 m centre","6 m droite","9 m gauche","9 m droite"];
+const ZONES=["Haut gauche","Haut centre","Haut droite","Milieu gauche","Centre","Milieu droit","Bas gauche","Bas centre","Bas droite"];
+const KEY="u11_handball_v12";
+let players=["Joueur 1","Joueur 2","Joueur 3","Joueur 4","Joueur 5","Joueur 6","Joueur 7","Joueur 8","Joueur 9","Joueur 10","Joueur 11","Joueur 12"];
+let present=new Set(players.slice(0,6)), data={}, currentPlayer="", exercise="", maxShots=5, zoneMode=false, engagementSeq=[], sessionActive=false, saved=false;
+
+function load(){
+ try{const s=JSON.parse(localStorage.getItem(KEY)||"{}"); if(Array.isArray(s.players)&&s.players.length) players=s.players; if(Array.isArray(s.history)) window.historyData=s.history; else window.historyData=[];}catch(e){window.historyData=[]}
+}
+function save(){localStorage.setItem(KEY,JSON.stringify({players,history:window.historyData||[]}));}
+function setupPlayers(){
+ const box=document.getElementById("playersSetup"); box.innerHTML="";
+ players.forEach((p,i)=>{
+   const d=document.createElement("div");
+   d.innerHTML=`<label>Joueur ${i+1}</label>
+   <div style="display:flex;gap:8px;align-items:center">
+   <input class="pname" data-i="${i}" value="${p}" placeholder="Ex. Jo joueur 1">
+   <label style="white-space:nowrap;margin:0"><input type="checkbox" class="present" data-i="${i}" ${present.has(p)?"checked":""} style="width:auto;margin-right:5px"> Présent</label>
+   </div>`;
+   const name=d.querySelector(".pname");
+   name.onchange=()=>{
+     const old=players[i], val=name.value.trim()||("Joueur "+(i+1));
+     if(present.has(old)){present.delete(old);present.add(val)}
+     players[i]=val; save();
+   };
+   d.querySelector(".present").onchange=e=>{
+     const val=players[i]; e.target.checked?present.add(val):present.delete(val);
+   };
+   box.appendChild(d);
+ });
+}
+function saveRoster(){
+ const inputs=[...document.querySelectorAll(".pname")];
+ inputs.forEach((input,i)=>{
+   const val=input.value.trim()||("Joueur "+(i+1));
+   players[i]=val;
+ });
+ const checked=[...document.querySelectorAll(".present")];
+ present=new Set();
+ checked.forEach((c,i)=>{if(c.checked)present.add(players[i])});
+ save();
+ setupPlayers();
+ alert("Liste des joueurs enregistrée.");
+}
+function setPresence(all){
+ document.querySelectorAll(".present").forEach((c,i)=>{
+   c.checked=all; all?present.add(players[i]):present.delete(players[i]);
+ });
+}
+function selectedExercise(){
+ const v=document.getElementById("exercise").value; zoneMode=v.endsWith("z"); maxShots=parseInt(v);
+ document.getElementById("engagementBox").classList.toggle("hidden",!zoneMode);
+ const eb=document.getElementById("engagements"); eb.innerHTML="";
+ if(zoneMode){engagementSeq=[]; for(let i=0;i<maxShots;i++){const d=document.createElement("div");d.innerHTML=`<label>Tir ${i+1}</label><select class="eng">${POS.map((x,j)=>`<option value="${j}">${x}</option>`).join("")}</select>`;eb.appendChild(d)}
+ document.querySelectorAll(".eng").forEach((s,i)=>s.onchange=()=>engagementSeq[i]=parseInt(s.value));}
+}
+function gks(){return [gk1.value.trim(),gk2.value.trim(),gk3.value.trim()].filter(Boolean)}
+function begin(){
+ const names=players.map((p,i)=>document.querySelector(`.present[data-i="${i}"]`)?.checked?p:null).filter(Boolean);
+ if(!names.length){alert("Sélectionne au moins un joueur présent.");return}
+ const gs=gks(); if(!gs.length){alert("Renseigne au moins le gardien 1.");return}
+ if(zoneMode){engagementSeq=[...document.querySelectorAll(".eng")].map(x=>parseInt(x.value))}
+ exercise=document.getElementById("exercise").value; maxShots=parseInt(exercise);
+ data={}; names.forEach(p=>data[p]={shots:[],gk:gs[0]});
+ currentPlayer=names[0]; sessionActive=true;saved=false;
+ document.getElementById("setup").classList.add("hidden");document.getElementById("summary").classList.add("hidden");document.getElementById("work").classList.remove("hidden");
+ renderWork();
+}
+function renderNav(){
+ const nav=document.getElementById("playerNav");nav.innerHTML="";
+ Object.keys(data).forEach(p=>{const b=document.createElement("button");b.textContent=p;b.className=p===currentPlayer?"active":"";b.onclick=()=>{currentPlayer=p;renderWork()};nav.appendChild(b)})
+}
+function renderGK(){
+ const s=document.getElementById("playerGK"), old=data[currentPlayer].gk; const gs=gks(); s.innerHTML=gs.map(x=>`<option>${x}</option>`).join(""); s.value=old&&gs.includes(old)?old:gs[0]; data[currentPlayer].gk=s.value;
+ s.onchange=()=>{data[currentPlayer].gk=s.value;renderWork()};
+}
+function shotResult(q){return q.result||"À renseigner"}
+function stats(p){
+ const a=data[p]?.shots||[];return {n:a.length,but:a.filter(x=>x.result==="But").length,arret:a.filter(x=>x.result==="Arrêt").length,poteau:a.filter(x=>x.result==="Poteau").length,barre:a.filter(x=>x.result==="Barre").length,cote:a.filter(x=>x.result==="À côté").length};
+}
+function renderGKStats(){
+ const box=document.getElementById("gkTable"); if(!box)return;
+ const map={};
+ Object.entries(data).forEach(([p,v])=>{
+   const g=v.gk||"—"; map[g]??={players:new Set(),shots:0,saves:0};
+   map[g].players.add(p);
+   (v.shots||[]).forEach(q=>{map[g].shots++;if(q.result==="Arrêt")map[g].saves++});
+ });
+ box.innerHTML=Object.entries(map).map(([g,v])=>{
+   const pct=v.shots?Math.round(v.saves/v.shots*100):0;
+   return `<tr><td><b>${g}</b></td><td>${v.players.size}</td><td>${v.shots}</td><td>${v.saves}</td><td>${pct}%</td></tr>`;
+ }).join("");
+}
+function renderWork(){
+ if(!data[currentPlayer]) return; renderNav();renderGK();
+ const a=data[currentPlayer].shots, n=a.length;
+ document.getElementById("progress").innerHTML=`<b>${n}/${maxShots}</b> tirs enregistrés`;
+ const currentResult=document.getElementById("currentResult"); if(currentResult) currentResult.value="À renseigner";
+ document.getElementById("shotInfo").textContent=n<maxShots?`TIR ${n+1} / ${maxShots}`:"SÉRIE TERMINÉE — tu peux corriger un tir";
+ document.getElementById("engagementCurrent").textContent=zoneMode&&n<maxShots?`Engagement du tir ${n+1} : ${POS[engagementSeq[n]]}`:"";
+ const s=stats(currentPlayer);
+ renderGKStats();
+ document.getElementById("liveKpi").innerHTML=`<div><b>${s.n}</b>Tirs</div><div><b>${s.but}</b>Buts</div><div><b>${s.arret}</b>Arrêts</div><div><b>${s.n?Math.round(s.but/s.n*100):0}%</b>Réussite</div>`;
+ const tb=document.getElementById("shotTable");tb.innerHTML="";
+ const markerBox=document.getElementById("markers"); markerBox.innerHTML="";
+ a.forEach((q,i)=>{
+   if(typeof q.x==="number" && typeof q.y==="number"){
+     const m=document.createElement("div"); m.className="marker "+(q.inside?"in":"out");
+     m.style.left=q.x+"px"; m.style.top=q.y+"px"; m.title="Tir "+(i+1); m.textContent=(i+1);
+     markerBox.appendChild(m);
+   }
+ });
+ a.forEach((q,i)=>{
+   const tr=document.createElement("tr");
+   tr.innerHTML=`<td>${i+1}</td><td>${zoneMode?POS[q.engagement]:"—"}</td><td>${q.inside?ZONES[q.zone]||"Dans cage":"À côté"}</td>
+<td><select class="resultSelect" data-result="${i}">
+<option value="À renseigner">À renseigner</option><option value="But">But</option><option value="Arrêt">Arrêt</option><option value="Poteau">Poteau</option><option value="Barre">Barre</option><option value="À côté">À côté</option>
+</select></td><td><button class="secondary" data-edit="${i}">✏ Modifier impact</button></td>`;
+   const rs=tr.querySelector("[data-result]");rs.value=shotResult(q);rs.onchange=()=>{q.result=rs.value;renderWork()};
+   tr.querySelector("[data-edit]").onclick=()=>editShot(i);tb.appendChild(tr);
+ });
+ document.getElementById("analysis").classList.add("hidden");
+}
+function addShot(x,y){
+ const a=data[currentPlayer].shots;
+ if(a.length>=maxShots){alert("Les tirs sont terminés. Utilise « Modifier » pour corriger un tir.");return}
+ const rect=document.getElementById("goal").getBoundingClientRect();
+ const inner=document.querySelector(".goalInner").getBoundingClientRect();
+ const inside=x>=inner.left&&x<=inner.right&&y>=inner.top&&y<=inner.bottom;
+ let zone=-1;
+ if(inside){const col=Math.min(2,Math.floor((x-inner.left)/(inner.width/3)));const row=Math.min(2,Math.floor((y-inner.top)/(inner.height/3)));zone=row*3+col}
+ const q={x:x-rect.left,y:y-rect.top,inside,zone,result:inside?"But":"À côté",engagement:zoneMode?engagementSeq[a.length]:null};
+ q.result=inside ? document.getElementById("currentResult").value : "À côté";
+ if(inside && q.result==="À renseigner") q.result="But";
+ a.push(q);
+ document.getElementById("currentResult").value="À renseigner";
+ renderWork();
+}
+function editShot(i){
+ const q=data[currentPlayer].shots[i];
+ const r=prompt("Résultat : But / Arrêt / Poteau / Barre / À côté / À renseigner",q.result);
+ if(r===null)return;
+ const allowed=["But","Arrêt","Poteau","Barre","À côté","À renseigner"];
+ if(!allowed.includes(r)){alert("Résultat non reconnu.");return}
+ q.result=r; renderWork();
+}
+document.getElementById("goal").addEventListener("click",e=>addShot(e.clientX,e.clientY));
+document.getElementById("undoBtn").onclick=()=>{const a=data[currentPlayer].shots;if(a.length){a.pop();renderWork()}};
+document.getElementById("analysisBtn").onclick=()=>{
+ const a=data[currentPlayer].shots,s=stats(currentPlayer);let txt=`<b>${currentPlayer}</b> : ${s.n} tirs, ${s.but} buts, ${s.arret} arrêts, ${s.cote} tirs à côté, ${s.poteau} poteaux, ${s.barre} barres.`;
+ if(zoneMode&&a.length){const m={};a.forEach(q=>{const z=POS[q.engagement];m[z]??={n:0,but:0};m[z].n++;if(q.result==="But")m[z].but++});txt+=`<br><br><b>Par zone d'engagement :</b> `+Object.entries(m).map(([z,v])=>`${z} ${v.but}/${v.n}`).join(" • ")}
+ document.getElementById("analysis").innerHTML=txt;document.getElementById("analysis").classList.remove("hidden");
+};
+document.getElementById("exercise").onchange=selectedExercise;
+document.getElementById("startBtn").onclick=begin;
+document.getElementById("backSetup").onclick=()=>{document.getElementById("work").classList.add("hidden");document.getElementById("setup").classList.remove("hidden");window.scrollTo({top:0,behavior:"smooth"});};
+document.getElementById("homeBtn").onclick=()=>{document.getElementById("work").classList.add("hidden");document.getElementById("summary").classList.add("hidden");document.getElementById("setup").classList.remove("hidden");window.scrollTo({top:0,behavior:"smooth"});};
+document.getElementById("endBtn").onclick=finish;
+document.getElementById("seasonBtn").onclick=()=>document.getElementById("season").scrollIntoView({behavior:"smooth"});
+document.getElementById("historyBtn").onclick=()=>{renderHistory();document.getElementById("history").scrollIntoView({behavior:"smooth"})};
+document.getElementById("historySession").onchange=renderHistoryDetail;
+document.getElementById("newSessionBtn").onclick=()=>{document.getElementById("summary").classList.add("hidden");document.getElementById("setup").classList.remove("hidden");window.scrollTo({top:0,behavior:"smooth"});setupPlayers();selectedExercise();};
+document.getElementById("saveRosterBtn").onclick=saveRoster;
+document.getElementById("selectAllBtn").onclick=()=>setPresence(true);
+document.getElementById("clearAllBtn").onclick=()=>setPresence(false);
+document.getElementById("exportBtn").onclick=exportData;
+document.getElementById("importBtn").onclick=()=>document.getElementById("importFile").click();
+document.getElementById("importFile").onchange=e=>{if(e.target.files[0])importData(e.target.files[0]);e.target.value="";};
+document.getElementById("resetDataBtn").onclick=()=>{if(confirm("Effacer tous les historiques de saison sur cet appareil ?")){localStorage.removeItem(KEY);window.historyData=[];load();alert("Historique effacé.");renderSeason()}}
+function finish(){
+ if(saved)return;
+ const today=new Date().toLocaleDateString("fr-FR");
+ const session={date:today,iso:new Date().toISOString(),exercise,players:{}};
+ Object.entries(data).forEach(([p,v])=>{const s=stats(p);if(s.n)session.players[p]={gk:v.gk,shots:s.n,but:s.but,arret:s.arret,cote:s.cote,poteau:s.poteau,barre:s.barre,success:Math.round(s.but/s.n*100),details:v.shots}});
+ window.historyData=window.historyData||[];window.historyData.push(session);save();saved=true;sessionActive=false;
+ document.getElementById("work").classList.add("hidden");document.getElementById("summary").classList.remove("hidden");
+ document.getElementById("finalSummary").innerHTML=`<p><b>${today}</b> • ${exercise.replace("z"," — zones d'engagement")}</p>`+Object.entries(session.players).map(([p,v])=>`<div class="status"><b>${p}</b> — ${v.shots} tirs • ${v.but} buts • ${v.arret} arrêts • ${v.success}%</div>`).join("");
+ renderSeason();
+}
+function renderHistory(){
+ const sel=document.getElementById("historySession");
+ if(!sel)return;
+ const hist=window.historyData||[];
+ sel.innerHTML='<option value="">Choisir une séance</option>'+hist.slice().reverse().map((s,i)=>{
+   const idx=hist.length-1-i;
+   const count=Object.keys(s.players||{}).length;
+   return `<option value="${idx}">${s.date} — ${s.exercise} — ${count} joueur${count>1?"s":""}</option>`;
+ }).join("");
+ renderHistoryDetail();
+}
+function renderHistoryDetail(){
+ const sel=document.getElementById("historySession"), box=document.getElementById("historyDetail");
+ if(!sel || !box || sel.value===""){if(box)box.innerHTML="";return}
+ const sess=(window.historyData||[])[Number(sel.value)];
+ if(!sess){box.innerHTML="";return}
+ const rows=Object.entries(sess.players||{});
+ const total=rows.reduce((a,[p,v])=>({shots:a.shots+(v.shots||0),but:a.but+(v.but||0),arret:a.arret+(v.arret||0)}),{shots:0,but:0,arret:0});
+ box.innerHTML=`
+ <div class="status"><b>📅 ${sess.date}</b> &nbsp; • &nbsp; Exercice : <b>${sess.exercise}</b> &nbsp; • &nbsp; ${rows.length} joueur${rows.length>1?"s":""}</div>
+ <div class="kpi" style="margin-top:12px">
+   <div><b>${total.shots}</b>Tirs</div><div><b>${total.but}</b>Buts</div>
+   <div><b>${total.arret}</b>Arrêts</div><div><b>${total.shots?Math.round(total.but/total.shots*100):0}%</b>Réussite</div>
+ </div>
+ <h3 style="margin-top:18px">Détail des joueurs</h3>
+ <div class="scroll"><table><thead><tr><th>Joueur</th><th>Gardien</th><th>Tirs</th><th>Buts</th><th>Arrêts</th><th>Poteaux</th><th>Barres</th><th>À côté</th><th>Réussite</th></tr></thead>
+ <tbody>${rows.map(([p,v])=>`<tr><td><b>${p}</b></td><td>${v.gk||"—"}</td><td>${v.shots||0}</td><td>${v.but||0}</td><td>${v.arret||0}</td><td>${v.poteau||0}</td><td>${v.barre||0}</td><td>${v.cote||0}</td><td>${v.success||0}%</td></tr>`).join("")}</tbody></table></div>
+ <h3 style="margin-top:18px">🎯 Détail des impacts</h3>
+ <div class="scroll"><table><thead><tr><th>Joueur</th><th>Tir</th><th>Engagement</th><th>Impact</th><th>Résultat</th></tr></thead>
+ <tbody>${rows.flatMap(([p,v])=>(v.details||[]).map((q,i)=>`<tr><td>${p}</td><td>${i+1}</td><td>${q.engagement!==null && q.engagement!==undefined?POS[q.engagement]:"—"}</td><td>${q.inside?ZONES[q.zone]||"Dans cage":"À côté"}</td><td>${q.result||"À renseigner"}</td></tr>`)).join("")}</tbody></table></div>`;
+}
+function exportData(){
+ const payload={
+   version:"U11-V18",
+   exportedAt:new Date().toISOString(),
+   players:players,
+   history:window.historyData||[]
+ };
+ const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+ const url=URL.createObjectURL(blob);
+ const a=document.createElement("a");
+ a.href=url;
+ const d=new Date().toISOString().slice(0,10);
+ a.download="Suivi_Tirs_U11_"+d+".json";
+ document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function importData(file){
+ const reader=new FileReader();
+ reader.onload=()=>{
+   try{
+     const payload=JSON.parse(reader.result);
+     if(!payload || !Array.isArray(payload.players) || !Array.isArray(payload.history)) throw new Error("format");
+     if(!confirm("Importer cette sauvegarde remplacera la liste des joueurs et l'historique actuellement présents sur cet appareil. Continuer ?")) return;
+     players=payload.players.slice(0,12);
+     while(players.length<12) players.push("Joueur "+(players.length+1));
+     window.historyData=payload.history;
+     present=new Set(players);
+     save();
+     setupPlayers();
+     renderSeason();
+     renderHistory();
+     alert("Sauvegarde importée avec succès.");
+   }catch(e){alert("Cette sauvegarde n'est pas reconnue.");}
+ };
+ reader.readAsText(file);
+}
+function renderSeason(){
+ const sel=document.getElementById("seasonPlayer"),old=sel.value;const names=[...new Set((window.historyData||[]).flatMap(s=>Object.keys(s.players||{})))];sel.innerHTML=`<option value="">Choisir un joueur</option>`+names.map(p=>`<option>${p}</option>`).join("");if(names.includes(old))sel.value=old;renderSeasonPlayer();
+}
+document.getElementById("seasonPlayer").onchange=renderSeasonPlayer;
+function renderSeasonPlayer(){
+ const p=document.getElementById("seasonPlayer").value,v=document.getElementById("seasonView");if(!p){v.innerHTML="";return}
+ const rows=(window.historyData||[]).flatMap(s=>s.players[p]?[{date:s.date,exercise:s.exercise,...s.players[p]}]:[]);
+ const total=rows.reduce((a,r)=>({shots:a.shots+r.shots,but:a.but+r.but,arret:a.arret+r.arret}),{shots:0,but:0,arret:0});
+ v.innerHTML=`<div class="kpi"><div><b>${rows.length}</b>Séances</div><div><b>${total.shots}</b>Tirs</div><div><b>${total.but}</b>Buts</div><div><b>${total.shots?Math.round(total.but/total.shots*100):0}%</b>Réussite</div></div>
+ <div class="scroll" style="margin-top:12px"><table><thead><tr><th>Date</th><th>Exercice</th><th>Gardien</th><th>Tirs</th><th>Buts</th><th>Arrêts</th><th>Réussite</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.date}</td><td>${r.exercise}</td><td>${r.gk}</td><td>${r.shots}</td><td>${r.but}</td><td>${r.arret}</td><td>${r.success}%</td></tr>`).join("")}</tbody></table></div>`;
+}
+load();setupPlayers();selectedExercise();renderSeason();renderHistory();
+</script>
+<script>
+if("serviceWorker" in navigator && location.protocol!=="file:"){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+}
+</script>
+</body></html>
