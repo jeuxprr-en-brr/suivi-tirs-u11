@@ -28,6 +28,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px so
 .targetWrap{display:flex;justify-content:center;margin:14px 0}
 .goalOuter{width:min(760px,94vw);aspect-ratio:1.55;border:7px solid #333;border-radius:18px;background:#fdfdfd;position:relative;cursor:crosshair;overflow:hidden}
 #markers{position:absolute;inset:0;z-index:20;pointer-events:none}
+#historyGoal{touch-action:manipulation}
 .goalInner{position:absolute;left:12%;top:10%;width:76%;height:80%;border:4px solid #555;background:linear-gradient(#f8fbff,#fff)}
 .zone{position:absolute;width:33.3333%;height:33.3333%;border:1px dashed #b7c0c8}
 .z1{left:0;top:0}.z2{left:33.333%;top:0}.z3{left:66.666%;top:0}.z4{left:0;top:33.333%}.z5{left:33.333%;top:33.333%}.z6{left:66.666%;top:33.333%}.z7{left:0;top:66.666%}.z8{left:33.333%;top:66.666%}.z9{left:66.666%;top:66.666%}
@@ -163,6 +164,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px so
 const POS=["Aile gauche","Arrière gauche","Centre","Arrière droit","Aile droite","6 m gauche","6 m centre","6 m droite","9 m gauche","9 m droite"];
 const ZONES=["Haut gauche","Haut centre","Haut droite","Milieu gauche","Centre","Milieu droit","Bas gauche","Bas centre","Bas droite"];
 const KEY="u11_handball_v12";
+let editingShotIndex=null, historyEditing=null;
 let players=["Joueur 1","Joueur 2","Joueur 3","Joueur 4","Joueur 5","Joueur 6","Joueur 7","Joueur 8","Joueur 9","Joueur 10","Joueur 11","Joueur 12"];
 let present=new Set(players.slice(0,6)), data={}, currentPlayer="", exercise="", maxShots=5, zoneMode=false, engagementSeq=[], sessionActive=false, saved=false;
 
@@ -258,7 +260,7 @@ function renderWork(){
  const a=data[currentPlayer].shots, n=a.length;
  document.getElementById("progress").innerHTML=`<b>${n}/${maxShots}</b> tirs enregistrés`;
  const currentResult=document.getElementById("currentResult"); if(currentResult) currentResult.value="À renseigner";
- document.getElementById("shotInfo").textContent=n<maxShots?`TIR ${n+1} / ${maxShots}`:"SÉRIE TERMINÉE — tu peux corriger un tir";
+ document.getElementById("shotInfo").textContent=editingShotIndex!==null?`CORRECTION DU TIR ${editingShotIndex+1} — clique sur le nouvel impact`:n<maxShots?`TIR ${n+1} / ${maxShots}`:"SÉRIE TERMINÉE — tu peux corriger un tir";
  document.getElementById("engagementCurrent").textContent=zoneMode&&n<maxShots?`Engagement du tir ${n+1} : ${POS[engagementSeq[n]]}`:"";
  const s=stats(currentPlayer);
  renderGKStats();
@@ -277,14 +279,25 @@ function renderWork(){
    tr.innerHTML=`<td>${i+1}</td><td>${zoneMode?POS[q.engagement]:"—"}</td><td>${q.inside?ZONES[q.zone]||"Dans cage":"À côté"}</td>
 <td><select class="resultSelect" data-result="${i}">
 <option value="À renseigner">À renseigner</option><option value="But">But</option><option value="Arrêt">Arrêt</option><option value="Poteau">Poteau</option><option value="Barre">Barre</option><option value="À côté">À côté</option>
-</select></td><td><button class="secondary" data-edit="${i}">✏ Modifier impact</button></td>`;
+</select></td><td><button class="secondary" data-edit="${i}">${editingShotIndex===i?"Clique sur la cible…":"✏ Modifier impact"}</button></td>`;
    const rs=tr.querySelector("[data-result]");rs.value=shotResult(q);rs.onchange=()=>{q.result=rs.value;renderWork()};
-   tr.querySelector("[data-edit]").onclick=()=>editShot(i);tb.appendChild(tr);
+   tr.querySelector("[data-edit]").onclick=()=>{editingShotIndex=i;renderWork();};tb.appendChild(tr);
  });
  document.getElementById("analysis").classList.add("hidden");
 }
 function addShot(x,y){
  const a=data[currentPlayer].shots;
+ if(editingShotIndex!==null){
+   const i=editingShotIndex, q=a[i];
+   const rect=document.getElementById("goal").getBoundingClientRect();
+   const inner=document.querySelector("#goal .goalInner").getBoundingClientRect();
+   const inside=x>=inner.left&&x<=inner.right&&y>=inner.top&&y<=inner.bottom;
+   let zone=-1;
+   if(inside){const col=Math.min(2,Math.floor((x-inner.left)/(inner.width/3)));const row=Math.min(2,Math.floor((y-inner.top)/(inner.height/3)));zone=row*3+col;}
+   q.x=x-rect.left;q.y=y-rect.top;q.inside=inside;q.zone=zone;
+   if(!inside)q.result="À côté";else if(q.result==="À côté")q.result="But";
+   editingShotIndex=null;renderWork();return;
+ }
  if(a.length>=maxShots){alert("Les tirs sont terminés. Utilise « Modifier » pour corriger un tir.");return}
  const rect=document.getElementById("goal").getBoundingClientRect();
  const inner=document.querySelector(".goalInner").getBoundingClientRect();
@@ -297,14 +310,6 @@ function addShot(x,y){
  a.push(q);
  document.getElementById("currentResult").value="À renseigner";
  renderWork();
-}
-function editShot(i){
- const q=data[currentPlayer].shots[i];
- const r=prompt("Résultat : But / Arrêt / Poteau / Barre / À côté / À renseigner",q.result);
- if(r===null)return;
- const allowed=["But","Arrêt","Poteau","Barre","À côté","À renseigner"];
- if(!allowed.includes(r)){alert("Résultat non reconnu.");return}
- q.result=r; renderWork();
 }
 document.getElementById("goal").addEventListener("click",e=>addShot(e.clientX,e.clientY));
 document.getElementById("undoBtn").onclick=()=>{const a=data[currentPlayer].shots;if(a.length){a.pop();renderWork()}};
@@ -339,6 +344,40 @@ function finish(){
  document.getElementById("finalSummary").innerHTML=`<p><b>${today}</b> • ${exercise.replace("z"," — zones d'engagement")}</p>`+Object.entries(session.players).map(([p,v])=>`<div class="status"><b>${p}</b> — ${v.shots} tirs • ${v.but} buts • ${v.arret} arrêts • ${v.success}%</div>`).join("");
  renderSeason();
 }
+function recalcHistoryPlayer(v){
+ const d=v.details||[];
+ v.shots=d.length;
+ v.but=d.filter(q=>q.result==="But").length;
+ v.arret=d.filter(q=>q.result==="Arrêt").length;
+ v.poteau=d.filter(q=>q.result==="Poteau").length;
+ v.barre=d.filter(q=>q.result==="Barre").length;
+ v.cote=d.filter(q=>q.result==="À côté").length;
+ v.success=v.shots?Math.round(v.but/v.shots*100):0;
+}
+function updateHistoryResult(sessionIndex,playerName,shotIndex,value){
+ const sess=window.historyData[sessionIndex], v=sess.players[playerName];
+ if(!v || !v.details || !v.details[shotIndex])return;
+ v.details[shotIndex].result=value;recalcHistoryPlayer(v);save();renderHistoryDetail();renderSeason();
+}
+function startHistoryImpactEdit(sessionIndex,playerName,shotIndex){
+ historyEditing={sessionIndex,playerName,shotIndex};
+ document.getElementById("historyEditNotice").classList.remove("hidden");
+ document.getElementById("historyImpactEditor").classList.remove("hidden");
+ document.getElementById("historyImpactEditor").scrollIntoView({behavior:"smooth",block:"center"});
+}
+document.addEventListener("click",e=>{
+ const goal=e.target.closest("#historyGoal");
+ if(!goal||!historyEditing)return;
+ const {sessionIndex,playerName,shotIndex}=historyEditing;
+ const rect=goal.getBoundingClientRect(), inner=goal.querySelector(".goalInner").getBoundingClientRect();
+ const inside=e.clientX>=inner.left&&e.clientX<=inner.right&&e.clientY>=inner.top&&e.clientY<=inner.bottom;
+ let zone=-1;
+ if(inside){const col=Math.min(2,Math.floor((e.clientX-inner.left)/(inner.width/3)));const row=Math.min(2,Math.floor((e.clientY-inner.top)/(inner.height/3)));zone=row*3+col;}
+ const q=window.historyData[sessionIndex].players[playerName].details[shotIndex];
+ q.x=e.clientX-rect.left;q.y=e.clientY-rect.top;q.inside=inside;q.zone=zone;
+ if(!inside)q.result="À côté";else if(q.result==="À côté")q.result="But";
+ recalcHistoryPlayer(window.historyData[sessionIndex].players[playerName]);save();historyEditing=null;renderHistoryDetail();renderSeason();
+});
 function renderHistory(){
  const sel=document.getElementById("historySession");
  if(!sel)return;
@@ -351,6 +390,7 @@ function renderHistory(){
  renderHistoryDetail();
 }
 function renderHistoryDetail(){
+ historyEditing=null;
  const sel=document.getElementById("historySession"), box=document.getElementById("historyDetail");
  if(!sel || !box || sel.value===""){if(box)box.innerHTML="";return}
  const sess=(window.historyData||[])[Number(sel.value)];
@@ -367,8 +407,18 @@ function renderHistoryDetail(){
  <div class="scroll"><table><thead><tr><th>Joueur</th><th>Gardien</th><th>Tirs</th><th>Buts</th><th>Arrêts</th><th>Poteaux</th><th>Barres</th><th>À côté</th><th>Réussite</th></tr></thead>
  <tbody>${rows.map(([p,v])=>`<tr><td><b>${p}</b></td><td>${v.gk||"—"}</td><td>${v.shots||0}</td><td>${v.but||0}</td><td>${v.arret||0}</td><td>${v.poteau||0}</td><td>${v.barre||0}</td><td>${v.cote||0}</td><td>${v.success||0}%</td></tr>`).join("")}</tbody></table></div>
  <h3 style="margin-top:18px">🎯 Détail des impacts</h3>
- <div class="scroll"><table><thead><tr><th>Joueur</th><th>Tir</th><th>Engagement</th><th>Impact</th><th>Résultat</th></tr></thead>
- <tbody>${rows.flatMap(([p,v])=>(v.details||[]).map((q,i)=>`<tr><td>${p}</td><td>${i+1}</td><td>${q.engagement!==null && q.engagement!==undefined?POS[q.engagement]:"—"}</td><td>${q.inside?ZONES[q.zone]||"Dans cage":"À côté"}</td><td>${q.result||"À renseigner"}</td></tr>`)).join("")}</tbody></table></div>`;
+ <div id="historyEditNotice" class="notice hidden">Correction en cours : clique sur le nouvel emplacement dans la cage ou à l'extérieur.</div>
+ <div id="historyImpactEditor" class="targetWrap hidden">
+   <div class="goalOuter" id="historyGoal"><div class="goalInner">
+     <div class="zone z1"><span>1</span></div><div class="zone z2"><span>2</span></div><div class="zone z3"><span>3</span></div>
+     <div class="zone z4"><span>4</span></div><div class="zone z5"><span>5</span></div><div class="zone z6"><span>6</span></div>
+     <div class="zone z7"><span>7</span></div><div class="zone z8"><span>8</span></div><div class="zone z9"><span>9</span></div>
+   </div></div>
+ </div>
+ <div class="scroll"><table><thead><tr><th>Joueur</th><th>Tir</th><th>Engagement</th><th>Impact</th><th>Résultat</th><th>Correction</th></tr></thead>
+ <tbody>${rows.flatMap(([p,v])=>(v.details||[]).map((q,i)=>`<tr><td>${p}</td><td>${i+1}</td><td>${q.engagement!==null && q.engagement!==undefined?POS[q.engagement]:"—"}</td><td>${q.inside?ZONES[q.zone]||"Dans cage":"À côté"}</td><td><select onchange="updateHistoryResult(${Number(sel.value)},${JSON.stringify(p).replace(/"/g,'&quot;')},${i},this.value)">
+ <option value="À renseigner" ${(!q.result||q.result==="À renseigner")?"selected":""}>À renseigner</option><option value="But" ${q.result==="But"?"selected":""}>But</option><option value="Arrêt" ${q.result==="Arrêt"?"selected":""}>Arrêt</option><option value="Poteau" ${q.result==="Poteau"?"selected":""}>Poteau</option><option value="Barre" ${q.result==="Barre"?"selected":""}>Barre</option><option value="À côté" ${q.result==="À côté"?"selected":""}>À côté</option>
+ </select></td><td><button class="secondary" onclick="startHistoryImpactEdit(${Number(sel.value)},${JSON.stringify(p).replace(/"/g,'&quot;')},${i})">✏ Modifier impact</button></td></tr>`)).join("")}</tbody></table></div>`;
 }
 function exportData(){
  const payload={
